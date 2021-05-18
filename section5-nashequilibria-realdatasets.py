@@ -190,7 +190,7 @@ U = np.array(v[:, i])
 sc = SpectralClustering(n_clusters=k,affinity="precomputed",n_init=200)
 ysc = sc.fit_predict(A)
 
-no_iterations = 10
+no_iterations = 20
 
 ### CLOSENESS UTILITY ###
 conductance_random = {}

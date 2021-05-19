@@ -84,7 +84,6 @@ gg = sorted(nx.connected_components(G_og),key=len,reverse=True)[0]
 Gc = G_og.subgraph(gg)
 
 list_nodes=list(Gc.nodes())
-print("read the APS graph")
 
 
 # finding the spectrum of the graph
@@ -102,7 +101,6 @@ filename = 'Facebook-clusteringgames-utilities-k' + str(k) + '.csv'
 Gc = nx.read_edgelist('Facebook/facebook_combined.txt')
 
 list_nodes=list(Gc.nodes())
-print("read the Facebook graph")
 
 # finding the spectrum of the graph
 A = nx.adjacency_matrix(Gc)
@@ -117,7 +115,6 @@ genderfeatfinder = {}
 
 # find the sensitive feaures (anonymized gender), and place them in a dictionary
 for u in egos: 
-    print(u)
     genderfeatfinder[u] = {}
     filenamefeat = 'Facebook/' + u + '.featnames'
     ffeat = open(filenamefeat)
@@ -127,7 +124,6 @@ for u in egos:
         genderfeatfinder[u][myrowfeat[0]] = myrowfeat[1].split(';')[0]
     ffeat.close()
     gender_ind = [k for k,v in genderfeatfinder[u].items() if v == 'gender']
-    #print(gender_ind)
     filenameego= 'Facebook/' + u +'.egofeat'
     fego = open(filenameego)
     readerego =csv.reader(fego)
@@ -165,7 +161,6 @@ G_og = nx.read_edgelist('Downloads/Friendship-network_data_2013.csv')
 gg = sorted(nx.connected_components(G_og),key=len,reverse=True)[0]
 Gbig = G_og.subgraph(gg)
 Gc = Gbig.copy()
-print("read the Highschool graph")
 
 # k is the number of clusters for spectral clustering
 #k = 4
@@ -235,8 +230,6 @@ for iter in range(no_iterations):
     y = np.zeros(len(list_nodes)) 
     for i in range(k):
         y[[list_nodes.index(xx) for xx in part[i]]] = i
-    print(y)
-
 
     y_copy = copy.deepcopy(y)
     y_util = np.zeros(len(Gc.nodes()))
@@ -248,15 +241,12 @@ for iter in range(no_iterations):
         x = utility_node_divided(Gc, list_nodes, y_copy, k, u)
         y_util[list_nodes.index(u)] = max(x, key=x.get)
 
-    #print(list(y_util) == list(y_copy))
-
     y = copy.deepcopy(y_copy)
 
     counter =0 
     while list(y_util) != list(y):
         print("number of unmoved nodes: ", len(np.where(y==y_util)[0]))
-        #print(y)
-        #print(y_util)
+
         counter += 1
         if counter > 100:
             break
@@ -271,11 +261,9 @@ for iter in range(no_iterations):
             else:
                 y_utiltest[list_nodes.index(u)] = y_util[list_nodes.index(u)]
         y_util = y_utiltest.copy()
-        print(list(y_util) == list(y))
     for u in Gc.nodes():
         util_all[iter] += utility_node_divided(Gc, list_nodes, y_util, k, u)[y_util[list_nodes.index(u)]]
     util_all[iter] /= len(list_nodes)
-    print([len(np.where(y_util == kk)[0]) for kk in range(k)])
     conductance_random[iter] = compute_conductance(Gc,list_nodes,y_utiltest,k)
 conductance_random_avg = np.mean([x for x in conductance_random.values()])
 conductance_random_std = np.std([xx for xx in conductance_random.values()])
@@ -328,14 +316,11 @@ for iter in range(no_iterations):
         x = utility_node_elkind(Gc, list_nodes, y_copy, k, u)
         y_util[list_nodes.index(u)] = max(x, key=x.get)
 
-    #print(list(y_util) == list(y_copy))
     y = copy.deepcopy(y_copy)
 
     counter =0 
     while list(y_util) != list(y):
         print("number of unmoved nodes: ", len(np.where(y==y_util)[0]))
-        print(y)
-        print(y_util)
         counter += 1
         if counter > 200:
             break
@@ -350,11 +335,9 @@ for iter in range(no_iterations):
             else:
                 y_utiltest[list_nodes.index(u)] = y_util[list_nodes.index(u)]
         y_util = y_utiltest.copy()
-        #print(list(y_util) == list(y))
     for u in Gc.nodes():
         util_all[iter] += utility_node_divided(Gc, list_nodes, y_util, k, u)[y_util[list_nodes.index(u)]]
     util_all[iter] /= len(list_nodes)
-    #print([len(np.where(y_util == kk)[0]) for kk in range(k)])
     conductance_random[iter] = compute_conductance(Gc,list_nodes,y_utiltest,k)
 conductance_random_avg = np.mean([x for x in conductance_random.values()])
 conductance_random_std = np.std([xx for xx in conductance_random.values()])

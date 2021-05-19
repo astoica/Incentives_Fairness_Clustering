@@ -1,5 +1,4 @@
-''' In this code we're replacing negative floyd warshall with the SPFA algorithm to find negative cycles;
-we use SPFA in two ways: to find negative cycles in G_M and to assert that there are no negative t-cycles in G_new'''
+''' This code implements the set of algorithms described in Section 6 and in the Appendix in order to find the next point in the fairness/utility-quality trade-off curve.'''
 import networkx as nx
 import csv 
 import numpy as np
@@ -15,6 +14,8 @@ from sklearn.metrics.pairwise import euclidean_distances
 import pickle
 from sklearn.metrics import silhouette_score 
 
+# the function cluster_proportions() computes the proportions of different communities in each cluster; 
+# the community affiliation of a node is embedded in a graph attribute called 'color'; for using the real data, embed as such.
 def cluster_proportions(G, list_nodes_G, no_clusters, cluster_assignment):
     # sizes of clusters                                                                                                    
     unique, counts = np.unique(cluster_assignment, return_counts=True)
@@ -38,6 +39,8 @@ def cluster_proportions(G, list_nodes_G, no_clusters, cluster_assignment):
         cluster_proportion[kk] /= cluster_sizes[kk]
     return cluster_sizes, cluster_proportion, cluster_majority, cluster_minority
 
+# the function graph_communities() finds the ratio of majority and minority nodes in the graph
+# the community affiliation of a node is embedded in a graph attribute called 'color'; for using the real data, embed as such.
 def graph_communities(G, list_nodes_G):
     maj_no = 0
     min_no = 0
@@ -48,6 +51,7 @@ def graph_communities(G, list_nodes_G):
             min_no += 1
     return maj_no, min_no
 
+# the function compute_fairness_avgprop() computes the average fairness as defined by balance for a clustering
 def compute_fairness_avgprop(G, list_nodes_G, no_clusters, cluster_assignment):
     fairness_clusters = {}
     [cluster_sizes, cluster_proportion, cluster_majority, cluster_minority] = cluster_proportions(G,list_nodes_G, no_clusters, cluster_assignment)
@@ -59,6 +63,7 @@ def compute_fairness_avgprop(G, list_nodes_G, no_clusters, cluster_assignment):
     fairness_overall = np.mean(list(fairness_clusters.values()))
     return fairness_clusters, fairness_overall
 
+# the function compute_fairness_avgprop_mfhg() computes the average utility as defined by mfu
 # this utility function is mfu, from Price of Pareto Optimality in hedonic games by elkind et al, namely, w_i(C) / |C| - 1 (or w_i(C)/|C|) where w_i(C) is the sum of utility of node i in cluster C
 def compute_util_avgprop_mfhg(G, list_nodes_G, no_clusters, cluster_assignment):
     util_clusters = {}
@@ -72,7 +77,7 @@ def compute_util_avgprop_mfhg(G, list_nodes_G, no_clusters, cluster_assignment):
     util_overall = np.mean(list(util_clusters.values()))
     return util_clusters, util_overall
 
-# this utility function is the closeness utility
+# the function compute_util_avgprop_closeness() computes the average utility as defined by the closeness utility
 def compute_util_avgprop_closeness(G, list_nodes_G, no_clusters, cluster_assignment):
     util_clusters = {}
     for i in range(no_clusters):
@@ -90,7 +95,7 @@ def compute_util_avgprop_closeness(G, list_nodes_G, no_clusters, cluster_assignm
     util_overall = np.mean(list(util_clusters.values()))
     return util_clusters, util_overall
 
-
+# the function compute_conductance() computes average conductance for a clustering assignment
 def compute_avg_conductance(G, list_nodes_G, no_clusters, cluster_assignment):
     conductance = 0
     conductance_clusters = {}
@@ -101,10 +106,12 @@ def compute_avg_conductance(G, list_nodes_G, no_clusters, cluster_assignment):
     conductance = np.mean(list(conductance_clusters.values()))
     return conductance_clusters, conductance
 
+# the function compute_avg_kdistance_cl() computes the average distance to the k-means center obtained from the kmeans algorithm for a specified cluster
 def compute_avg_kdistance_cl(cluster_assignment, my_cluster, km_distances):
     avgdist = km_distances[np.where(cluster_assignment==my_cluster)][:,my_cluster].mean()
     return avgdist
 
+# the function compute_avg_kdistance() computes the average distance of all clusters to their respective k-means centers obtained from the kmeans algorithm
 def compute_avg_kdistance(cluster_assignment, no_clusters, km_distances):
     dist_clusters = {}
                                                                                                      
@@ -113,6 +120,7 @@ def compute_avg_kdistance(cluster_assignment, no_clusters, km_distances):
     avgdist = np.mean(list(dist_clusters.values()))
     return dist_clusters, avgdist
 
+# # the function compute_avg_ncut() computes the normalized cut size between a subgraph S and a graph G
 def compute_avg_ncut(G, list_nodes_G, no_clusters, cluster_assignment):
     ncut = 0
     ncut_clusters = {}
@@ -123,6 +131,7 @@ def compute_avg_ncut(G, list_nodes_G, no_clusters, cluster_assignment):
     ncut = np.mean(list(ncut_clusters.values()))
     return ncut_clusters, ncut
 
+# the function doubly_weighted_G() creates a transformed doubly-weighted graph from an original inputted graph, where the weights represent the difference fairness/utility and quality, respectively.
 def doubly_weighted_G(G,Gnew, list_nodes_G,cluster_assignment,no_clusters, km_distances):
     [fairness_cl, fairness_all] = compute_fairness_avgprop(G, list_nodes_G, no_clusters, cluster_assignment)
     [distances_cl, distances] = compute_avg_kdistance(cluster_assignment, no_clusters, km_distances)
@@ -166,7 +175,7 @@ def doubly_weighted_G(G,Gnew, list_nodes_G,cluster_assignment,no_clusters, km_di
         Gnew.add_edge(j,nn,auv=0,tuv=0)
     return Gnew
 
-# find whether there is a negative cycle in t_uv weights
+# this is the classic Floyd-Warshall algorithm for finding whether there is a negative cycle in t_uv weights
 def negCyclefloydWarshall(G): 
     V = len(G.nodes())
     # dist[][] will be the 
@@ -236,7 +245,7 @@ def negCyclefloydWarshall(G):
    
     return False
 
-# create graph with weights a_uv * M - t_uv
+# the function create_M_graph() creates a transformed graph with weights a_uv * M - t_uv
 def create_M_graph(G,newG, theM):
     myG_M = nx.DiGraph()
     myG_M.add_nodes_from(G)
@@ -247,7 +256,7 @@ def create_M_graph(G,newG, theM):
         myG_M.add_edge(e[0],e[1],weight=auv_var[e]+theM*tuv_var[e])
     return myG_M
 
-# without early termination and with cycle termination:
+# the function SPFA() implements a faster version of the Floyd-Warshall algorithm for finding negative cycles, without early termination and with cycle termination
 def SPFA(G):
     queue = []
     for v in G.nodes():
@@ -268,7 +277,7 @@ def SPFA(G):
                     queue.append(v)
     return "no negative cycle detected"
 
-# trace the negative cycle from the vertex given by SPFA
+# the function Trace() traces the negative cycle from the vertex given by SPFA
 def Trace(pre, v):
     mys = []
     while v not in mys:
@@ -280,11 +289,11 @@ def Trace(pre, v):
     cycle.append(v)
     return cycle
 
-# Slope of line
+# the function compute_slope() computes the slope of line in Euclidean space
 def compute_slope(x1, y1, x2, y2):
     return (float)(y2-y1)/(x2-x1)
 
-# without early termination and with cycle termination:
+# the function SPFA() implements a faster version of the Floyd-Warshall algorithm for finding negative cycles, without early termination and with cycle termination, used only for the t-weights
 def SPFA2(G):
     queue = []
     for v in G.nodes():
@@ -452,8 +461,7 @@ if __name__ == "__main__":
                     break
                 Mfind *= 2
 
-        print
-        print("we found Mlow")
+        #print("we found Mlow")
         # initialize M and the limits for the binary search
         M = Mfind/2
         delta = Mfind/2

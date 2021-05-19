@@ -10,7 +10,7 @@ import copy
 import math 
 from sklearn.cluster import SpectralClustering, KMeans
 
-# the fucnction compute_conductance() computes average conductance for a clustering assignment
+# the function compute_conductance() computes average conductance for a clustering assignment
 def compute_conductance(G, list_of_nodes_G, cluster_assignment, no_of_clusters):
     clconductance = {}
     for i in range(no_of_clusters):

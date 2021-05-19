@@ -1,3 +1,7 @@
+''' This code implements the methodology described in Section 5, computing the average utility gained through Spectral Clustering,
+Fair Spectral Clustering, and equilibrium solutions from the defined utility functions. It also computes conductance and balance of 
+Spectral Clustering and Fair Spectral Clustering.'''
+
 import networkx as nx
 import csv 
 import numpy as np
@@ -14,12 +18,14 @@ from sklearn.metrics.pairwise import euclidean_distances
 import pickle
 from sklearn.metrics import silhouette_score 
 
+# the function cut_size() computes the cut size between a subgraph S and a graph G
 def cut_size(G, S, T=None, weight=None):
     edges = nx.edge_boundary(G, S, T, data=weight, default=1)
     if G.is_directed():
         edges = chain(edges, nx.edge_boundary(G, T, S, data=weight, default=1))
     return sum(weight for u, v, weight in edges)
 
+# the function incluster_degree() computes the incluster degree of a node, given a graph and a specified clustering partition (number of edges that are fully within the same cluster as the source node) 
 def incluster_degree(G, list_nodes_G, cluster_assignment, node):
     degu = 0
     for nbr in G.neighbors(node):
@@ -29,6 +35,7 @@ def incluster_degree(G, list_nodes_G, cluster_assignment, node):
             degu += 1
     return degu
 
+# the function utility_node_divided() computes the closeness utility of a node, given a graph and a clustering partition
 def utility_node_divided(G, list_nodes_G, cluster_assignment, no_clusters, threshold, node):
     lengths_total = nx.single_source_shortest_path_length(G, node)
     lengths = {}
@@ -48,26 +55,7 @@ def utility_node_divided(G, list_nodes_G, cluster_assignment, no_clusters, thres
         utility[i] = threshold * deg_u / lengths[i] 
     return utility
 
-# this utility function is from Price of Pareto Optimality in hedonic games by elkind et al, namely, w_i(C) / |C| - 1 (or w_i(C)/|C|) where w_i(C) is the sum of utility of node i in cluster C
-def utility_node_elkind(G, list_nodes_G, cluster_assignment, no_clusters, threshold, node):
-    #lengths_total = nx.single_source_shortest_path_length(G, node)
-    #lengths = {}
-    #for i in range(no_clusters):
-    #    lengths[i] = 0 
-    #    cl = np.where(cluster_assignment == i)[0]
-    #    for j in cl: 
-    #        lengths[i] += lengths_total[list_nodes_G[j]]
-    #deg_u = incluster_degree(G, list_nodes_G, cluster_assignment, node)
-    cluster_assignment_counterfactual = {}
-
-    utility = {}
-    for i in range(no_clusters):
-        cluster_assignment_counterfactual[i] = copy.deepcopy(cluster_assignment)
-        cluster_assignment_counterfactual[i][list_nodes_G.index(node)] = i
-        deg_u = incluster_degree(G, list_nodes_G, cluster_assignment_counterfactual[i], node)
-        utility[i] = threshold * deg_u / len(np.where(cluster_assignment_counterfactual[i] == i)[0]) 
-    return utility
-
+# the utility function utility_node_elkind() computes the mfu of a node given a graph and a clustering partition
 # this utility function is from Price of Pareto Optimality in hedonic games by elkind et al, namely, w_i(C) / |C| - 1 (or w_i(C)/|C|) where w_i(C) is the sum of utility of node i in cluster C
 def utility_node_elkind1(G, list_nodes_G, cluster_assignment, no_clusters, threshold, node):
     #lengths_total = nx.single_source_shortest_path_length(G, node)
@@ -88,6 +76,7 @@ def utility_node_elkind1(G, list_nodes_G, cluster_assignment, no_clusters, thres
         utility[i] = threshold * deg_u / (len(np.where(cluster_assignment_counterfactual[i] == i)[0]) - 1)
     return utility
 
+# the function compute_conductance() computes average conductance for a clustering assignment
 def compute_conductance(G, list_of_nodes_G, cluster_assignment, no_of_clusters):
     clconductance = {}
     for i in range(no_of_clusters):
@@ -95,6 +84,7 @@ def compute_conductance(G, list_of_nodes_G, cluster_assignment, no_of_clusters):
         clconductance[i] = nx.conductance(G,icl)
     return 1 - sum(clconductance.values())/len(clconductance)
 
+# the function compute_balance() computes the average balance of clusters from a clustering partition and a graph G 
 def compute_balance(G,list_of_nodes_G,cluster_assignment,no_of_clusters, sensitive_info):
     balance_avg = 0
     for cl in range(no_of_clusters):
@@ -131,58 +121,30 @@ for the sensitive attribute [from https://github.com/matthklein/fair_spectral_cl
 #                  data point
 
 def Fair_SC_normalized(G, adj,no_clusters,sensitive):
-    # MATLAB: n = size(adj, 1);
     n = np.shape(adj)[1]
     
     #converting sensitive to a vector with entries in [h] and building F %%%
-#     sens_unique=unique(sensitive);
     sens_unique = np.unique(sensitive)
-    
-#     h = length(sens_unique);
     h = len(sens_unique)
-#     sens_unique=reshape(sens_unique,[1,h]);
-    #sens_unique=np.reshape(sens_unique,[1,h], order="F")
-    
-#     sensitiveNEW=sensitive;
     sensitiveNEW=sensitive.copy()
-    
-#     temp=1;
     temp = 0
     
-#     for ell=sens_unique
-#         sensitiveNEW(sensitive==ell)=temp;
-#         temp=temp+1;
-#     end
     for ell in sens_unique:
         sensitiveNEW[np.where(sensitive==ell)[0]] = temp
         temp += 1
 
-
-#     F=zeros(n,h-1);
     F=np.zeros([n,h-1])
 
-#     for ell=1:(h-1)
-#         temp=(sensitiveNEW == ell);
-#         F(temp,ell)=1; 
-#         groupSize = sum(temp);
-#         F(:,ell) = F(:,ell)-groupSize/n;
-#     end
     for ell in range(h-1):
         temp = np.where(sensitiveNEW == ell)[0]
         F[temp,ell]=1
         groupSize = len(temp)
         F[:,ell] = F[:,ell]-groupSize/n
 
-#     degrees = sum(adj, 1);
-#     D = diag(degrees);
-#     L = D-adj;
     L = nx.normalized_laplacian_matrix(G)
     L.todense()
     D = np.diag(np.sum(np.array(adj.todense()), axis=1))
 
-#     Z = null(F');
-#     Q=sqrtm(Z'*D*Z);
-#     Qinv=inv(Q);
     _,Z = null(F.transpose())
     zz = ((Z.transpose()).dot(D)).dot(Z)
     # this needs to be checked!! 
@@ -190,35 +152,22 @@ def Fair_SC_normalized(G, adj,no_clusters,sensitive):
     Q = Q.real
     Qinv = np.linalg.inv(Q)
     
-#     Msymm=Qinv'*Z'*L*Z*Qinv;
     Msymm = ((((Qinv.transpose()).dot(Z.transpose())).dot(L.todense())).dot(Z)).dot(Qinv)
-#     Msymm=(Msymm+Msymm')/2;
     Msymm = (Msymm+Msymm.transpose())/2
     print("computed a bunch of matrices up to Msymm")
-#     try
-#         [Y, eigValues] = eigs(Msymm,k,'smallestabs','MaxIterations',500,'SubspaceDimension',min(size(Msymm,1),max(2*k,25)));
-#     catch
-#         [Y, eigValues] = eigs(Msymm,k,'smallestreal','MaxIterations',1000,'SubspaceDimension',min(size(Msymm,1),max(2*k,25)));
-#     end
 
-    #e,v = np.linalg.eig(Msymm.todense())
     e,v = np.linalg.eig(Msymm)
     print("computed Msymm spectrum")
     
     i = [list(e).index(j) for j in sorted(list(e))[1:no_clusters]]
-    #print(i)
     Y = np.array(v[:, i])
     Y = Y.real
-
-#     H = Z*Qinv*Y;
     H = (Z.dot(Qinv)).dot(Y)
     
-    print("ready for kmeans on H")
-    #clusterLabels = kmeans(H,k,'Replicates',10);
+    #print("ready for kmeans on H")
     km_fair = KMeans(init='k-means++', n_clusters=no_clusters, max_iter=200, n_init=200, verbose=0, random_state=3425)
     km_fair.fit(H)
     clusterLabels = km_fair.labels_
-    #end
     return clusterLabels
 
 def null(a, rtol=1e-5):
@@ -228,15 +177,16 @@ def null(a, rtol=1e-5):
 
 ### the following section reads in one of the datasets: APS, Facebook, Highschool; uncomment for the data desired to use
 '''#APS dataset:
-# this is an earlier, smaller version of DBLP with ~53k nodes
+# reading the data as a graph
 G_og = nx.read_gexf('Downloads/clustering_plotting/APS/sampled_APS_pacs052030.gexf')
 
+# extracting the largest connected component 
 gg = sorted(nx.connected_components(G_og),key=len,reverse=True)[0]
 Gc = G_og.subgraph(gg)
 print(nx.info(Gc))
 
 list_nodes=list(Gc.nodes())
-print("read the APS graph")
+#print("read the APS graph")
 
 # k is the number of clusters for spectral clustering
 #k = 4
@@ -249,6 +199,8 @@ D = np.diag(np.sum(np.array(A.todense()), axis=1))
 
 e, v = np.linalg.eig(L.todense())
 tau = 20
+
+# creating a list sensitive[] that contains the community affiliation
 sensitive = []
 for u in list_nodes:
     if (Gc.nodes[u]['pacs'] == '05.30.-d'):
@@ -260,12 +212,11 @@ dataset = 'APS'
 '''
 
 '''#Facebook dataset:
+# reading the data as a graph
 Gc = nx.read_edgelist('Downloads/facebook_combined.txt')
 
-print(nx.info(Gc))
-
 list_nodes=list(Gc.nodes())
-print("read the Facebook graph")
+#print("read the Facebook graph")
 
 # k is the number of clusters for spectral clustering
 #k = 4
@@ -276,8 +227,8 @@ L.todense()
 D = np.diag(np.sum(np.array(A.todense()), axis=1))
 
 e, v = np.linalg.eig(L.todense())
-tau = 1
 
+# placing the sensitive features of the data (anonymized gender) in a dictionary
 gender = {}
 egos = ['0', '107','348','414','686','698','1684','1912','3437','3980']
 genderfeatfinder = {}
@@ -326,17 +277,20 @@ dataset = 'Facebook'
 
 '''#Highschool dataset:
 # this is a dataset from a Highschool netwrol from: http://www.sociopatterns.org/datasets/high-school-contact-and-friendship-networks/
+# reading the data as a graph
 G_og = nx.read_edgelist('Downloads/Friendship-network_data_2013.csv')
 
+# extracting the largest connected component of the graph
 gg = sorted(nx.connected_components(G_og),key=len,reverse=True)[0]
 Gbig = G_og.subgraph(gg)
 Gc = Gbig.copy()
-print("read the Highschool graph")
+p#rint("read the Highschool graph")
 
 # k is the number of clusters for spectral clustering
 #k = 4
 # finding the spectrum of the graph
 
+# placing the sensitive features of the data (unanonymized gender) in a dictionary
 gender = {}
 
 filename = 'Downloads/metadata_2013.txt'
